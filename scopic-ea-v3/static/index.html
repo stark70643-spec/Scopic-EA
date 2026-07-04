@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SCOPIC EA — GC / NQ Order Flow</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/styles.css"/>
+</head>
+<body>
+
+<header class="topbar glass">
+  <div><div class="brand-name">SCOPIC EA</div><div class="brand-sub">GC · MGC · NQ · MNQ</div></div>
+  <span class="spacer"></span>
+  <span class="sessions" id="sessionClocks"></span>
+  <span class="fv" title="FV daily loss limit"><span class="lbl">FV</span><span class="fv-slots" id="fvSlots"></span></span>
+  <button class="pill" id="aiPill" title="AI Analyst — click to start/stop"><span class="dot"></span><span id="aiPillText">AI —</span></button>
+  <span class="pill conn" id="connPill"><span class="dot"></span><span id="connText">connecting</span></span>
+</header>
+
+<div class="banner" id="standdownBanner" hidden>DAILY LOSS LIMIT HIT — standing down until next session (18:00 NY). Signals are recorded but flagged.</div>
+
+<nav class="tabs glass" id="tabs">
+  <button class="tab active" data-tab="chart">Chart &amp; Signals</button>
+  <button class="tab" data-tab="ai">AI Analyst</button>
+  <button class="tab" data-tab="options">Options Flow</button>
+  <button class="tab" data-tab="strategies">Strategies</button>
+  <button class="tab" data-tab="news">News &amp; Econ</button>
+  <button class="tab" data-tab="world">World</button>
+  <button class="tab" data-tab="settings">Settings</button>
+</nav>
+
+<main>
+
+<section class="panel" id="tab-chart">
+  <div class="toolbar glass">
+    <span class="seg" id="segInstrument"><b class="on" data-v="GC">GC</b><b data-v="NQ">NQ</b></span>
+    <span class="seg" id="segInterval">
+      <b data-v="500T">500T</b><b class="on" data-v="5M">5M</b><b data-v="15M">15M</b>
+      <b data-v="1H">1H</b><b data-v="4H">4H</b><b data-v="1D">1D</b>
+    </span>
+    <span class="badge g">▲ Long</span><span class="badge r">▼ Short</span><span class="badge">Engine ▲▼ · AI ◆</span>
+    <span class="spacer"></span>
+    <span class="badge" id="regimeBadge">REGIME: —</span>
+    <span class="badge" id="cvdBadge">CVD —</span>
+  </div>
+
+  <div class="chart glass"><canvas id="cv"></canvas><div class="chart-tip" id="chartTip" hidden></div><div class="chart-glow"></div></div>
+  <div class="muted small" id="chartNote" style="margin:4px 6px 14px"></div>
+
+  <div class="toolbar glass tight">
+    <span class="sec-title" id="sigTitle">Signals — 5M</span>
+    <span class="seg" id="segSource"><b class="on" data-v="">All</b><b data-v="ENGINE">Engine</b><b data-v="AI_ANALYST">AI</b></span>
+    <label class="chk"><input type="checkbox" id="fUnconfirmed" checked> Intrabar</label>
+    <label class="chk"><input type="checkbox" id="fSuppressed"> Suppressed</label>
+    <span class="spacer"></span><span class="muted small" id="signalsMeta"></span>
+  </div>
+  <div id="signalsList" class="signals-list"><div class="empty glass">No signals yet on this timeframe. Keep MotiveWave running with the Scopic EA study attached.</div></div>
+</section>
+
+<section class="panel" id="tab-ai" hidden>
+  <div class="ai-control glass">
+    <button class="btn power" id="aiPower">START AI</button>
+    <div class="ai-status">
+      <div><span class="lbl">Model</span> <span id="aiModel">—</span></div>
+      <div><span class="lbl">Market</span> <span id="aiMarket">—</span></div>
+      <div><span class="lbl">Last run</span> <span id="aiLastRun">—</span></div>
+      <div><span class="lbl">Runs</span> <span id="aiRuns">0</span></div>
+      <div class="ai-err" id="aiError" hidden></div>
+    </div>
+    <div class="ai-quick">
+      <label>Every <input type="number" id="aiInterval" min="2" max="120" class="tiny"> min</label>
+      <label class="chk"><input type="checkbox" id="aiHoursOnly"> Market hours</label>
+      <label class="chk"><input type="checkbox" id="aiEvent"> Event trigger</label>
+      <button class="btn" id="aiAnalyzeGC">Analyze GC</button>
+      <button class="btn" id="aiAnalyzeNQ">Analyze NQ</button>
+    </div>
+  </div>
+
+  <div class="ai-grid">
+    <div>
+      <div class="sec-title">Latest analyses</div>
+      <div id="aiAnalyses" class="analyses-list"><div class="empty glass">No analyses yet.</div></div>
+    </div>
+    <div>
+      <div class="sec-title">Chat with the analyst</div>
+      <div class="chat-box glass">
+        <div class="chat-log" id="chatLog"><div class="chat-msg assistant">Ask about the current setup, or teach me a rule — press "Save as instruction" under my reply to make it permanent.</div></div>
+        <div class="chat-input"><textarea id="chatText" rows="2" placeholder="e.g. On GC, ignore signals during the first 15 minutes of NY open…"></textarea><button class="btn primary" id="chatSend">Send</button></div>
+      </div>
+      <div class="sec-title">Standing instructions</div>
+      <div class="instr-add"><input type="text" id="instrText" placeholder="Add a rule…"><button class="btn" id="instrAdd">Add</button></div>
+      <ul class="instr-list" id="instrList"></ul>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="tab-options" hidden>
+  <div class="toolbar glass">
+    <span class="seg" id="segOptInst"><b class="on" data-v="GC">GC (GLD proxy)</b><b data-v="NQ">NQ (QQQ proxy)</b></span>
+    <button class="btn" id="optRefresh">Refresh</button>
+    <span class="spacer"></span><span class="muted small" id="optAge"></span>
+  </div>
+  <div class="widgets" id="optWidgets"></div>
+  <div class="sec-title">Net GEX by strike (proxy)</div>
+  <div class="chart glass" style="height:340px"><canvas id="gexCv"></canvas><div class="chart-glow"></div></div>
+  <p class="muted small">Positioning context from delayed proxy chains; OI is prior-day settle. Never an entry trigger — your entries come from real-time order flow.</p>
+</section>
+
+<section class="panel" id="tab-strategies" hidden>
+  <div id="strategyCards" class="strategy-grid"></div>
+  <div class="sec-title">Performance by strategy × instrument</div>
+  <p class="muted small">Built from outcomes you log — includes the AI analyst so you can audit it against the engine.</p>
+  <table class="data-table glass" id="statsTable">
+    <thead><tr><th>Strategy</th><th>Inst</th><th>Signals</th><th>W</th><th>L</th><th>BE</th><th>Win rate</th><th>Avg R:R</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<section class="panel" id="tab-news" hidden>
+  <div class="news-grid">
+    <div>
+      <div class="sec-title">Economic calendar</div>
+      <p class="muted small">ForexFactory · High-impact USD events suppress signals ±<span id="blockMins">10</span> min.</p>
+      <table class="data-table glass" id="calTable"><thead><tr><th>Time (local)</th><th>Cur</th><th>Impact</th><th>Event</th><th>F'cast</th><th>Prev</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div>
+      <div class="sec-title">Headlines</div>
+      <ul class="headlines" id="headlines"></ul>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="tab-world" hidden>
+  <div class="world-grid" id="worldGrid"></div>
+</section>
+
+<section class="panel" id="tab-settings" hidden>
+  <div class="settings-grid">
+    <fieldset class="glass"><legend>Risk (FV framework)</legend>
+      <label>Account size (USD) <input type="number" id="sAccount" min="100" step="100"></label>
+      <label>Risk per trade (%) <input type="number" id="sRisk" min="0.05" max="5" step="0.05"></label>
+      <label>Daily loss limit <input type="number" id="sDaily" min="1" max="10" step="1"></label>
+      <label>Min R:R to show <input type="number" id="sMinRR" min="0" max="10" step="0.1"></label>
+    </fieldset>
+    <fieldset class="glass"><legend>Filters</legend>
+      <label>News blackout (± min) <input type="number" id="sNews" min="0" max="120"></label>
+      <label class="chk"><input type="checkbox" id="sUnconfirmed"> Accept intrabar (unconfirmed) signals</label>
+      <div class="chk-row"><span class="lbl">Instruments</span><label class="chk"><input type="checkbox" id="sInstGC"> GC</label><label class="chk"><input type="checkbox" id="sInstNQ"> NQ</label></div>
+      <div class="chk-row"><span class="lbl">Timeframes</span>
+        <label class="chk"><input type="checkbox" id="sTf500T"> 500T</label>
+        <label class="chk"><input type="checkbox" id="sTf5M"> 5M</label>
+        <label class="chk"><input type="checkbox" id="sTf15"> 15M</label>
+        <label class="chk"><input type="checkbox" id="sTf1H"> 1H</label>
+        <label class="chk"><input type="checkbox" id="sTf4H"> 4H</label>
+        <label class="chk"><input type="checkbox" id="sTf1D"> 1D</label>
+      </div>
+    </fieldset>
+    <fieldset class="glass"><legend>AI Analyst</legend>
+      <label class="chk"><input type="checkbox" id="sAiEnabled"> Auto-analysis running</label>
+      <label>Interval (min) <input type="number" id="sAiInterval" min="2" max="120"></label>
+      <label class="chk"><input type="checkbox" id="sAiHours"> Market hours only</label>
+      <label class="chk"><input type="checkbox" id="sAiEvent"> Event-triggered analysis</label>
+      <p class="muted small">Provider via Railway env — currently <span id="sAiModel">—</span>.</p>
+    </fieldset>
+    <fieldset class="glass"><legend>Account guards</legend>
+      <label class="chk"><input type="checkbox" id="sFlatOn"> Flat-time guard</label>
+      <label>Flat time (ET, HH:MM) <input type="text" id="sFlatTime" class="tiny" style="width:80px"></label>
+      <label>Block window (min before) <input type="number" id="sFlatMin" min="0" max="120"></label>
+      <p class="muted small">Verify the exact forced-flat time in your prop dashboard. Log $ P&amp;L on outcomes to track the day.</p>
+    </fieldset>
+  </div>
+  <div class="settings-actions"><button class="btn primary" id="saveSettings">Save changes</button><span class="muted" id="saveNote"></span></div>
+  <p class="muted small">Detection thresholds (imbalance ratio, cell volume…) live in the MotiveWave study, since detection runs inside MotiveWave.</p>
+</section>
+
+</main>
+
+<footer class="foot"><span>MotiveWave (Rithmic) → Railway → SCOPIC EA · AI: <span id="footModel">—</span></span><span>Signals flag conditions per your rules — not financial advice.</span></footer>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>
